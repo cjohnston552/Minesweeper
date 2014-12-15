@@ -1,0 +1,43 @@
+body {
+  background-color: #F8F8F8;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1.2em;
+  margin: 15px;
+}
+
+h1, p {
+  color: #333;
+}
+
+button
+{
+
+    font-size: 1.1em;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 40px 60px;
+    margin: 20px auto;
+    color: #ccc;
+    background-color: #555;
+    background: -webkit-linear-gradient(#888, #555);
+    background: linear-gradient(#888, #555);
+    border: 0 none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+
+#container_id {
+  height: 400px;
+  position: relative;
+  border: 1px solid #ccc;
+  background-color: #fff;
+}
+
+#text_id {
+  font-size: 24pt;
+  text-align: center;
+  margin-top: 140px;
+}

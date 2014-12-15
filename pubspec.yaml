@@ -1,0 +1,4 @@
+name: newminesweepertest
+description: A sample Chrome packaged application
+dependencies:
+  browser: any
