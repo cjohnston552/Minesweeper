@@ -1,9 +1,9 @@
 import 'dart:html';
 import 'dart:math';
 
-const EASY = const Difficulty(6);
-const INTERMEDIATE = const Difficulty(9);
-const HARD = const Difficulty(14);
+const EASY = const Difficulty(8);
+const INTERMEDIATE = const Difficulty(11);
+const HARD = const Difficulty(15);
 
 TableElement gameGrid;
 Element bombsLeftLabel;
@@ -74,7 +74,7 @@ void handleCellClick(MouseEvent e){
   //print('$clickedRow $clickedColumn');
   var cell = logicGrid[clickedColumn][clickedRow];
   //print('${cell.row} ${cell.column} ${cell.adjacentCount}');
-  if(cell.isUncovered) return;
+  if(cell.isUncovered) return;//TODO: Don't return. check for chordability
 
   bool shifted = e.shiftKey;
   //ShiftClick
@@ -82,8 +82,8 @@ void handleCellClick(MouseEvent e){
     if(cell.isFlagged){
       button.src = 'tileDefault.ico';
       button.style
-        ..width = '50px'
-        ..height = '50px';
+        ..width = '30px'
+        ..height = '30px';
       cell.isFlagged = false;
       bombsLeft += 1;
     } else {
@@ -97,6 +97,9 @@ void handleCellClick(MouseEvent e){
       loseGame();
     } else {
       int neighbors = cell.adjacentCount;
+      if(neighbors==0){
+        clearAdjacentZeros(cell);
+      }
       cell.isUncovered = true;
       button.src = 'tile${neighbors}.ico';
     }
@@ -114,85 +117,51 @@ handleDifficultyClick(Difficulty diff){
 }
 
 
-/*
+
 void clearAdjacentZeros(GridCell cell){
+  print('CZ $cell');
   cell.isUncovered = true;
-  (gameGrid.rows[cell.row].cells[cell.column] as ImageButtonInputElement).src = 'tile0.ico';
+  (gameGrid.rows[cell.row].cells[cell.column].lastChild as ImageButtonInputElement).src = 'tile0.ico';
   //check every valid nearby square. call clearAdjacentZeros on any 0s found
   var neighbors = logicGrid.getValidNeighbors(cell);
   for(int n=0;n<neighbors.length;n++){
-    
-  }
-  
-  
-  if(x>0){
-    if(y>0){
-      logicGrid[x-1][y-1]==0?clearAdjacentZeros(y-1,x-1):clearAdjacentTiles(y-1, x-1);
-    }
-    logicGrid[x-1][y]==0?clearAdjacentZeros(y,x-1):clearAdjacentTiles(y, x-1);
-  }
-  if(y>0){
-    logicGrid[x][y-1]==0?clearAdjacentZeros(y-1,x):clearAdjacentTiles(y-1, x);
-  }
-  if(x<(numcols-1)){
-    logicGrid[x+1][y]==0?clearAdjacentZeros(y,x+1):clearAdjacentTiles(y, x+1);
-    if(y<(numrows-1)){
-      logicGrid[x+1][y+1]==0?clearAdjacentZeros(y+1,x+1):clearAdjacentTiles(y+1, x+1);
+    if(!neighbors[n].isUncovered && !neighbors[n].isMine && !neighbors[n].isFlagged){
+      if(neighbors[n].adjacentCount==0) {
+        clearAdjacentZeros(neighbors[n]);
+      }
+      else {
+        clearAdjacentTiles(cell);
+      }
     }
   }
-  if(y<(numrows-1)){
-    logicGrid[x][y+1]==0?clearAdjacentZeros(y+1,x):clearAdjacentTiles(y+1, x);
-  }
-  if(x>0&&y<(numrows-1))logicGrid[x-1][y+1]==0?clearAdjacentZeros(y+1,x-1):clearAdjacentTiles(y+1, x-1);
-  
-  
-  if(x<(numcols-1)&&y>0)logicGrid[x+1][y-1]==0?clearAdjacentZeros(y-1,x+1):clearAdjacentTiles(y-1, x+1);
-  //reveal square
-  
-  logicGrid[x][y] = 2;
 }
 void clearAdjacentTiles(GridCell cell){
-  if(x>0){
-    if(y>0){
-      (gameGrid.rows[y-1].cells[x-1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x-1][y-1]~/10).toString()+'.ico';
-      logicGrid[x-1][y-1] += 2;
+  print('CT $cell');
+  cell.isUncovered = true;
+  (gameGrid.rows[cell.row].cells[cell.column].lastChild as ImageButtonInputElement).src = 'tile${cell.adjacentCount}.ico';
+  var neighbors = logicGrid.getValidNeighbors(cell);
+  for(int n=0;n<neighbors.length;n++){
+    if(!neighbors[n].isUncovered && !neighbors[n].isMine && !neighbors[n].isFlagged){
+      if(neighbors[n].adjacentCount==0) {
+        clearAdjacentZeros(neighbors[n]);
+      }
+      else {
+        neighbors[n].isUncovered = true;
+        (gameGrid.rows[neighbors[n].row].cells[neighbors[n].column].lastChild as ImageButtonInputElement).src = 'tile${neighbors[n].adjacentCount}.ico';
+      }
     }
-    (gameGrid.rows[y].cells[x-1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x-1][y]~/10).toString()+'.ico';
-    logicGrid[x-1][y] += 2;
-  }
-  if(y>0){
-    (gameGrid.rows[y-1].cells[x].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x][y-1]~/10).toString()+'.ico';
-    logicGrid[x][y-1] += 2;
-  }
-  if(x<(numcols-1)){
-    (gameGrid.rows[y].cells[x+1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x+1][y]~/10).toString()+'.ico';
-    logicGrid[x+1][y] += 2;
-    if(y<(numrows-1)){
-      (gameGrid.rows[y+1].cells[x+1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x+1][y+1]~/10).toString()+'.ico';
-      logicGrid[x+1][y+1] += 2;
-    }
-  }
-  if(y<(numrows-1)){
-    (gameGrid.rows[y+1].cells[x].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x][y+1]~/10).toString()+'.ico';
-    logicGrid[x][y+1] += 2;
-  }
-  if(x>0&&y<(numrows-1)){
-    (gameGrid.rows[y+1].cells[x-1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x-1][y+1]~/10).toString()+'.ico';
-    logicGrid[x-1][y+1] += 2;
-  }
-  
-  if(x<(numcols-1)&&y>0){
-    (gameGrid.rows[y-1].cells[x+1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x+1][y-1]~/10).toString()+'.ico';
-    logicGrid[x+1][y-1] += 2;
   }
 }
 
-*/
+
 
 
 
 
 void loseGame(){
+  print('lost');
+  redraw();
+
   window.alert("You Lose!");
   gameover = true;
 }
@@ -203,6 +172,20 @@ void winGame(){
 }
 
 bool isGameWon() => logicGrid.hasNoMoreSquares && bombsLeft == 0;
+
+void redraw(){
+  for(int r=0;r<logicGrid.rows;r++){
+    for(int c=0;c<logicGrid.columns;c++) {
+      GridCell cell = logicGrid[r][c];
+      if (!cell.isUncovered) {
+        if (cell.isMine && !cell.isFlagged)(gameGrid.rows[c].cells[r].lastChild as ImageButtonInputElement).src = 'tileBomb.ico';
+        else if(!cell.isMine)(gameGrid.rows[c].cells[r].lastChild as ImageButtonInputElement).src = 'tile${cell.adjacentCount}.ico';
+      }
+
+      cell.isUncovered = true;
+    }
+  }
+}
 
 class Grid {
   final int rows;
@@ -337,6 +320,6 @@ class Difficulty {
   final int value;
   const Difficulty(this.value);
   ///This is the bomb/difficulty equation! ///
-  int get bombs => (value*value)~/7 + (value);
+  int get bombs => ((value*value)*.42).floor() + (-3.1*value).floor()+6;
   int get size => value+1;
 }
