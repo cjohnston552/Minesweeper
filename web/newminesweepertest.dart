@@ -1,190 +1,130 @@
-
 import 'dart:html';
 import 'dart:math';
 
+const EASY = const Difficulty(6);
+const INTERMEDIATE = const Difficulty(9);
+const HARD = const Difficulty(14);
 
 TableElement gameGrid;
+Element bombsLeftLabel;
 
-int numrows = 5;
-int difficulty = 4;
-int diff1 = 4;
-int diff2 = 6;
-int diff3 = 10;
+var gameover = false;
+var difficulty = EASY;
 int bombsLeft = 6;
 int gamenum = 0;
-int numcols = 5;
 Grid logicGrid;
+
 void main() {
-  ButtonElement btn = querySelector('#newGame');
-  btn.onClick.listen(newGameHandler);
-  //Difficulty buttons
-  querySelector('#easy').onClick.listen(diffHandler);
-  querySelector('#intermediate').onClick.listen(diffHandler);
-  querySelector('#hard').onClick.listen(diffHandler);
-  startNewGame();
+  var header = new DivElement();
+  var newGameButton = new ButtonElement()..text='New Game'
+                                         ..onClick.listen(handleNewGameClick);
+  bombsLeftLabel = new SpanElement();
+  header.append(newGameButton);
+  header.appendText("Bombs Remaining:");
+  header.append(bombsLeftLabel);
+  document.body.append(header);
   
+  var difficultyBar = new DivElement();
+  var easyButton = new ButtonElement()..text='EASY'
+                                      ..onClick.listen(handleDifficultyClick(EASY));
+  var intermediateButton = new ButtonElement()..text='INTERMEDIATE'
+                                              ..onClick.listen(handleDifficultyClick(INTERMEDIATE));
+  var hardButton = new ButtonElement()..text='HARD'
+                                      ..onClick.listen(handleDifficultyClick(HARD));
+  difficultyBar..append(easyButton)
+               ..append(intermediateButton)
+               ..append(hardButton);
+  document.body.append(difficultyBar);
+  
+
+  gameGrid = new TableElement();
+  document.body.append(gameGrid);
+
+  startNewGame();
 }
+
 void startNewGame(){
-  bombsLeft = (difficulty*difficulty)~/7 + (difficulty);
-  numrows = numcols = difficulty+1;
-  logicGrid = new Grid(numrows,numcols);
-  setupLogicGrid();
-    gameGrid = querySelector('#gameGrid');
-    gameGrid.children.clear();
-    for(int x=0;x<numrows;x++){
-      gameGrid.addRow();
-      for(int y=0;y<numcols;y++){
-        gameGrid.rows[x].addCell();
-        ImageButtonInputElement button = new ImageButtonInputElement();
-        button.src = 'tileDefault.ico';
-        button.onClick.listen(clickHandler);
-        gameGrid.rows[x].cells[y].append(button);
-      }
-    }
-    gamenum+= 1;
-}
-void clickHandler(MouseEvent e){
-  int clickedY = ((e.target as Node).parent as TableCellElement).cellIndex;
-  int clickedX = ((e.target as Node).parent.parent as TableRowElement).rowIndex;
-  int code = logicGrid[clickedY][clickedX];
-  bool shifted = e.shiftKey;
-  print(clickedX);print(clickedY);
-  print(code);
-  ImageButtonInputElement button = gameGrid.rows[clickedX].cells[clickedY].lastChild;
-  //ShiftClick
-  if(shifted){
-    if(code==1){
-      code = 91;
-      button.src = 'tileFlagged.ico';
-      bombsLeft-=1;
-    }else if(code%10==0){
-      button.src = 'tileFlagged.ico';
-      code += 9;
-      bombsLeft-=1;
-    }else if(code==91 || code%10==9){
-      button.src = 'tileDefault.ico';
-      code==91?code=1:code-=9;
-      bombsLeft+=1;
-      
-    }else{}
-  }else{//Normal Click
-    if(code==1){
-      button.src = 'tileBomb.ico';
-      loseGame();
-    }else if(code%10==0 || code%10==9){
-      int neighbors = code~/10;
-      if(neighbors==0){
-        //clearAdjacentZeros(clickedX,clickedY);
-      }
-      //else{
-        code += 2;
-        button.src = 'tile' + neighbors.toString() + '.ico';
-      //}
+  gameover = false;
+  bombsLeft = difficulty.bombs;
+  logicGrid = new Grid(difficulty.size, difficulty.size);
+  bombsLeftLabel.text = bombsLeft.toString();
+  gameGrid.children.clear();
+  for(int x=0;x<logicGrid.rows;x++){
+    gameGrid.addRow();
+    for(int y=0;y<logicGrid.columns;y++){
+      gameGrid.rows[x].addCell();
+      gameGrid.rows[x].cells[y].append(new ImageButtonInputElement()
+                                            ..src = 'tileDefault.ico'
+                                            ..onClick.listen(handleCellClick)
+                                            ..style.width = '50px'
+                                            ..style.height = '50px');
     }
   }
-  querySelector('#bombsLeft').innerHtml = bombsLeft.toString();
-  logicGrid[clickedY][clickedX] = code;
-  gameGrid.rows[clickedX].cells[clickedY].lastChild.replaceWith(button);
+  gamenum+= 1;
+}
+
+handleNewGameClick(_)=> startNewGame();
+
+void handleCellClick(MouseEvent e){
+  if(gameover) return;
+
+  ImageButtonInputElement button = e.target;
+  int clickedColumn = (button.parent as TableCellElement).cellIndex;
+  int clickedRow = (button.parent.parent as TableRowElement).rowIndex;
+  //print('$clickedRow $clickedColumn');
+  var cell = logicGrid[clickedColumn][clickedRow];
+  //print('${cell.row} ${cell.column} ${cell.adjacentCount}');
+  if(cell.isUncovered) return;
+
+  bool shifted = e.shiftKey;
+  //ShiftClick
+  if(shifted){
+    if(cell.isFlagged){
+      button.src = 'tileDefault.ico';
+      button.style
+        ..width = '50px'
+        ..height = '50px';
+      cell.isFlagged = false;
+      bombsLeft += 1;
+    } else {
+      cell.isFlagged = true;
+      button.src = 'tileFlagged.ico';
+      bombsLeft -= 1;
+    }
+  } else {//Normal Click
+    if(cell.isMine){
+      button.src = 'tileBomb.ico';
+      loseGame();
+    } else {
+      int neighbors = cell.adjacentCount;
+      cell.isUncovered = true;
+      button.src = 'tile${neighbors}.ico';
+    }
+  }
+  bombsLeftLabel.text = bombsLeft.toString();
+
   //Victory Handler
-  if(gameWon()){
-    print('game is won');
+  if(isGameWon()){
     winGame();
   }
 }
-void newGameHandler(MouseEvent e){
-  print("newgame!");
-  startNewGame();
-}
 
-void diffHandler(MouseEvent e){
-  print((e.target as ButtonElement).id);
-  if((e.target as ButtonElement).id == 'easy'){
-    difficulty = diff1;
-  }else if((e.target as ButtonElement).id == 'intermediate'){
-    difficulty = diff2;
-  }else if((e.target as ButtonElement).id == 'hard'){
-    difficulty = diff3;
-  }
-  print(difficulty);
-  numrows = numcols = difficulty+1;
-}
-
-void setupLogicGrid(){
-  for(int j=0;j<numcols;j++){
-      for(int k=0;k<numrows;k++){
-        logicGrid[j][k] = 0;
-      }
-    }
-  var rand = new Random();
-  for(int i=0;i<bombsLeft;i++){
-    int nextbomb;
-    do{nextbomb = rand.nextInt(numrows*numcols);}while(logicGrid.data[nextbomb] == 1);
-    
-    logicGrid.data[nextbomb] = 1;
-  }
-  for(int j=0;j<numcols;j++){
-    for(int k=0;k<numrows;k++){
-      if(logicGrid[j][k]==0){
-        logicGrid[j][k] = countAdjacentBombs(j,k);
-      }
-    }
-  }
-  querySelector('#bombsLeft').innerHtml = bombsLeft.toString();
+handleDifficultyClick(Difficulty diff){
+  return (_)=> difficulty = diff;
 }
 
 
-int countAdjacentBombs(int j, int k){
-  int count = 0;
-  if(j>0){
-    if(k>0){
-      logicGrid[j-1][k-1]%10==1?count+=10:count=count;
-    }
-    logicGrid[j-1][k]%10==1?count+=10:count=count;
-  }
-  if(k>0){
-    logicGrid[j][k-1]%10==1?count+=10:count=count;
-  }
-  if(j<(numcols-1)){
-    logicGrid[j+1][k]%10==1?count+=10:count=count;
-    if(k<(numrows-1)){
-      logicGrid[j+1][k+1]%10==1?count+=10:count=count;
-    }
-  }
-  if(k<(numrows-1)){
-    logicGrid[j][k+1]%10==1?count+=10:count=count;
-  }
-  if(j>0&&k<(numrows-1))logicGrid[j-1][k+1]%10==1?count+=10:count=count;;
-  
-  
-  if(j<(numcols-1)&&k>0)logicGrid[j+1][k-1]%10==1?count+=10:count=count;;
-  
-  return count;
-}
-
-void loseGame(){
-  //Just remove clickhandler from the table, 
-  print("You Lose!");
-  for(int i=0;i<numrows;i++){
-    for(int j=0;j<numcols;j++){
-      gameGrid.rows[i].cells[j].removeEventListener('onClick', clickHandler);
-    }
-  }
-}
-
-void winGame(){
-  print("You Win!");
-  //get the board to stop responding somehow
-  for(int i=0;i<numrows;i++){
-    for(int j=0;j<numcols;j++){
-      gameGrid.rows[i].cells[j].removeEventListener('onClick', clickHandler);
-    }
-  }
-}
 /*
-void clearAdjacentZeros(int y,int x){
-  logicGrid[x][y] = 2;
-  (gameGrid.rows[y].cells[x].lastChild as ImageButtonInputElement).src = 'tile0.ico';
+void clearAdjacentZeros(GridCell cell){
+  cell.isUncovered = true;
+  (gameGrid.rows[cell.row].cells[cell.column] as ImageButtonInputElement).src = 'tile0.ico';
   //check every valid nearby square. call clearAdjacentZeros on any 0s found
+  var neighbors = logicGrid.getValidNeighbors(cell);
+  for(int n=0;n<neighbors.length;n++){
+    
+  }
+  
+  
   if(x>0){
     if(y>0){
       logicGrid[x-1][y-1]==0?clearAdjacentZeros(y-1,x-1):clearAdjacentTiles(y-1, x-1);
@@ -211,9 +151,7 @@ void clearAdjacentZeros(int y,int x){
   
   logicGrid[x][y] = 2;
 }
-
-
-void clearAdjacentTiles(int y, int x){
+void clearAdjacentTiles(GridCell cell){
   if(x>0){
     if(y>0){
       (gameGrid.rows[y-1].cells[x-1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x-1][y-1]~/10).toString()+'.ico';
@@ -247,53 +185,158 @@ void clearAdjacentTiles(int y, int x){
     (gameGrid.rows[y-1].cells[x+1].lastChild as ImageButtonInputElement).src = 'tile'+(logicGrid[x+1][y-1]~/10).toString()+'.ico';
     logicGrid[x+1][y-1] += 2;
   }
-}*/
-
-bool gameWon(){
-  bool won = false;
-  print('1');
-  if(noMoreSquares()){
-    print("nomoresquares");
-    if(bombsLeft==0)won=true;
-  }
-  return won;
 }
 
-bool noMoreSquares(){
-  bool nomore = true;
-  int art = 1;
-  print('nms?');
-  for(int k=0;k<logicGrid.data.length;k++){
-    if(logicGrid.data[k]<90 && logicGrid.data[k]%10<2)nomore=false;
-  }
-  print(nomore);
-  return nomore;
+*/
+
+
+
+
+void loseGame(){
+  window.alert("You Lose!");
+  gameover = true;
 }
+
+void winGame(){
+  window.alert("You Win!");
+  gameover = true;
+}
+
+bool isGameWon() => logicGrid.hasNoMoreSquares && bombsLeft == 0;
+
 class Grid {
-  //w is rows, h is columns
-  int w, h;
-  List data;
-  List cols;
-  Grid(this.w, this.h) {
-    data = new List.filled(w * h,0);
-    cols = new List.filled(h,new GridCol(data,1,h));
-    //x is which column
-    for (int x = 0; x < h; x++) {
-      cols[x] = new GridCol(data, x, w);
+  final int rows;
+  final int columns;
+  List<GridCol> _cols;
+  Grid(this.rows, this.columns) {
+    //print('Gridstart r$rows c$columns');
+    _cols = new List.generate(columns, (ndx)=> new GridCol(ndx+1));
+    
+    _randomizeMineLocations();
+
+    for(int j=0;j<rows;j++){
+      for(int k=0;k<columns;k++){
+        if(!_cols[j][k].isMine){
+          _cols[j][k].adjacentCount = _countAdjacentBombs(_cols[j][k]);
+        }
+      }
+    }
+    print(this);
+  }
+  
+  GridCol operator [](int x) => _cols[x];
+
+  bool get hasNoMoreSquares {
+    for(int c = 0; c < columns; c++){
+      for(int r = 0; r < rows; r++){
+        var cell = _cols[c][r];
+        if(cell.isNotActivated){
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  List<GridCell> getValidNeighbors(GridCell cell){
+    int c=cell.row;
+    int r=cell.column;
+    //print('r$r c$c');
+    var neighbors = new List<GridCell>();
+    if(r>0){
+      if(c>0){
+        neighbors.add(_cols[r-1][c-1]);
+      }
+      neighbors.add(_cols[r-1][c]);
+    }
+    if(c>0){
+      neighbors.add(_cols[r][c-1]);
+    }
+    if(r<(rows-1)){
+      neighbors.add(_cols[r+1][c]);
+      if(c<(columns-1)){
+        neighbors.add(_cols[r+1][c+1]);
+      }
+    }
+    if(c<(columns-1)){
+      neighbors.add(_cols[r][c+1]);
+    }
+    if(r>0&&c<(columns-1))neighbors.add(_cols[r-1][c+1]);
+    if(r<(columns-1)&&c>0)neighbors.add(_cols[r+1][c-1]);
+    //print('$cell n${neighbors.length}');
+    return neighbors;
+  }
+ 
+  _randomizeMineLocations(){
+    var rand = new Random();
+    for(int i=0;i<bombsLeft;i++){
+      var r;
+      do{
+        r = rand.nextInt(rows*columns);
+        //print('bomb@ $r');
+        
+      }while((_cols[r % columns][r ~/ columns]).isMine);
+      (_cols[r % columns][r ~/ columns]).isMine = true;
     }
   }
-  GridCol operator [](int x) {
-    return cols[x];
+
+  _countAdjacentBombs(cell){
+    List<GridCell> neighbs = getValidNeighbors(cell);
+    int count = 0;
+    for(int n=0;n< neighbs.length;n++){
+      if(neighbs[n].isMine)count++;
+    }
+    return count;
+  }
+  String toString(){
+    String gridString='';
+    for(int r=0;r<rows;r++){
+      String rowString='';
+      for(int c=0;c<columns;c++){
+        if(_cols[r][c].isMine)rowString+='* ';
+        else
+        rowString += _cols[r][c].adjacentCount.toString() + ' ';
+      }
+      gridString += rowString + '\n';
+    }
+    return gridString;
   }
 }
+
 class GridCol {
-  int x, w;
-  List data;
-  GridCol(this.data, this.x, this.w);
-  int operator [](int y) {
-    return data[y + x * w];
+  List<GridCell> data;
+
+  GridCol(int columnIndex){
+      data = new List.generate(difficulty.size, (ndx)=> new GridCell(ndx,columnIndex-1));
+      //print(data);
   }
-  void operator []= (int y, int value) {
-    data[y + x * w] = value;
+  GridCell operator [](int y){ 
+    //TODO: reset this to an inline function
+    //print('returning cell ${data[y]}');
+    return data[y];
+    }
+  operator []= (int y, GridCell value) => data[y] = value;
+}
+
+class GridCell {
+  bool isMine = false;
+  bool isUncovered = false;
+  bool isFlagged = false;
+  int row=0;
+  int column=0;
+  int adjacentCount = 0;
+  
+  GridCell(this.row,this.column){
+    
   }
+  String toString()=>'r$row c$column aC$adjacentCount';
+ 
+  bool get isNotActivated => (!isUncovered && !isFlagged);
+}
+
+class Difficulty {
+  final int value;
+  const Difficulty(this.value);
+  ///This is the bomb/difficulty equation! ///
+  int get bombs => (value*value)~/7 + (value);
+  int get size => value+1;
 }
